@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ماشین‌حساب ساده</title>
+  <style>
+    :root{
+      --bg: #0f172a;        /* slate-900 */
+      --panel: #111827;     /* gray-900 */
+      --btn: #1f2937;       /* gray-800 */
+      --btn-hover: #374151; /* gray-700 */
+      --accent: #22c55e;    /* green-500 */
+      --danger: #ef4444;    /* red-500 */
+      --text: #e5e7eb;      /* gray-200 */
+      --muted: #9ca3af;     /* gray-400 */
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100svh; display:grid; place-items:center;
+      background: radial-gradient(1200px 800px at 70% -10%, #1f2937 0%, #0b1222 45%, var(--bg) 100%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+    }
+    .app{
+      width:min(92vw, 420px);
+      background:linear-gradient(180deg, #0b1324, #0a0f1c);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:1.25rem; /* rounded-2xl */
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      overflow:hidden;
+    }
+    .display{
+      padding:1.25rem 1rem; min-height:140px; display:flex; flex-direction:column; gap:.5rem; justify-content:flex-end;
+      background: linear-gradient(180deg, #0f172a 0%, #0b1222 100%);
+    }
+    .prev{ color:var(--muted); font-size:1rem; min-height:1.4em; word-break:break-all; }
+    .curr{ font-size:2.75rem; line-height:1.1; font-weight:700; word-break:break-all; }
+
+    .keys{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:.55rem; padding: .9rem;
+      background: rgba(255,255,255,.02);
+    }
+    button{
+      appearance:none; border:0; border-radius:1rem; padding:1rem; font-size:1.25rem; font-weight:600;
+      background:var(--btn); color:var(--text); cursor:pointer; transition: transform .06s ease, background .2s ease, filter .2s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 6px 16px rgba(0,0,0,.35);
+      user-select:none;
+    }
+    button:hover{ background:var(--btn-hover); }
+    button:active{ transform: translateY(1px) scale(.99); filter:saturate(1.1); }
+
+    .op{ background: #0b3a2a; }
+    .op:hover{ background:#11533b; }
+    .accent{ background: var(--accent); color:#07130d; }
+    .accent:hover{ filter:brightness(.95); }
+    .danger{ background: #3b0f13; }
+    .danger:hover{ background:#55161b; }
+
+    .span-2{ grid-column: span 2; }
+
+    /* Make numbers adapt to length */
+    .fit{ display:inline-block; max-width:100%; }
+    .curr{ overflow:hidden; }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="ماشین‌حساب">
+    <section class="display" aria-live="polite">
+      <div class="prev" id="prev"></div>
+      <div class="curr" id="curr"><span class="fit" id="fit">0</span></div>
+    </section>
+
+    <section class="keys" role="group" aria-label="کلیدها">
+      <button class="danger" data-action="clear" aria-label="پاک کردن">AC</button>
+      <button data-action="delete" aria-label="حذف">DEL</button>
+      <button data-action="percent" aria-label="درصد">%</button>
+      <button class="op" data-op="/" aria-label="تقسیم">÷</button>
+
+      <button data-num>7</button>
+      <button data-num>8</button>
+      <button data-num>9</button>
+      <button class="op" data-op="*" aria-label="ضرب">×</button>
+
+      <button data-num>4</button>
+      <button data-num>5</button>
+      <button data-num>6</button>
+      <button class="op" data-op="-" aria-label="منها">−</button>
+
+      <button data-num>1</button>
+      <button data-num>2</button>
+      <button data-num>3</button>
+      <button class="op" data-op="+" aria-label="جمع">+</button>
+
+      <button data-action="negate" aria-label="مثبت/منفی">±</button>
+      <button class="span-2" data-num>0</button>
+      <button data-action="dot" aria-label="اعشار">.</button>
+      <button class="accent" data-action="equals" aria-label="برابر">=</button>
+    </section>
+  </main>
+
+  <script>
+    // Minimal JS for functionality
+    const prevEl = document.getElementById('prev');
+    const currEl = document.getElementById('curr');
+    const fitEl  = document.getElementById('fit');
+    const keys   = document.querySelector('.keys');
+
+    let current = '0';
+    let previous = '';
+    let operator = null;
+    let justEvaluated = false;
+
+    function updateDisplay(){
+      // Fit font size based on length
+      const len = current.toString().length;
+      let size = 2.75; // rem
+      if(len > 10) size = 2.2;
+      if(len > 14) size = 1.7;
+      if(len > 20) size = 1.3;
+      currEl.style.fontSize = size + 'rem';
+      fitEl.textContent = current;
+      prevEl.textContent = previous ? `${previous} ${symbol(operator)}` : '';
+    }
+
+    function symbol(op){
+      return op === '/' ? '÷' : op === '*' ? '×' : op === '-' ? '−' : op === '+' ? '+' : '';
+    }
+
+    function appendNumber(n){
+      if(justEvaluated){ current = '0'; justEvaluated = false; }
+      if(n === '0' && current === '0') return;
+      if(current === '0') current = n; else current += n;
+      updateDisplay();
+    }
+
+    function addDot(){
+      if(justEvaluated){ current = '0'; justEvaluated = false; }
+      if(!current.includes('.')){ current += '.'; updateDisplay(); }
+    }
+
+    function chooseOp(op){
+      if(operator && previous !== ''){
+        compute();
+      }
+      operator = op;
+      previous = current;
+      current = '0';
+      justEvaluated = false;
+      updateDisplay();
+    }
+
+    function clearAll(){ current='0'; previous=''; operator=null; justEvaluated=false; updateDisplay(); }
+    function del(){ if(justEvaluated){ clearAll(); return; } current = current.length>1 ? current.slice(0,-1) : '0'; updateDisplay(); }
+    function negate(){ if(current === '0') return; current = current.startsWith('-')? current.slice(1) : '-' + current; updateDisplay(); }
+    function percent(){ current = (parseFloat(current)/100).toString(); updateDisplay(); }
+
+    function compute(){
+      if(operator == null || previous === '') return;
+      const a = parseFloat(previous);
+      const b = parseFloat(current);
+      let res = 0;
+      switch(operator){
+        case '+': res = a + b; break;
+        case '-': res = a - b; break;
+        case '*': res = a * b; break;
+        case '/': res = b === 0 ? 'Cannot divide by 0' : a / b; break;
+      }
+      if(typeof res === 'number'){
+        // Round nicely
+        res = +parseFloat(res.toFixed(12));
+        current = res.toString();
+      } else {
+        current = res; // error message
+      }
+      previous = '';
+      operator = null;
+      justEvaluated = true;
+      updateDisplay();
+    }
+
+    keys.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      if(btn.hasAttribute('data-num')){ appendNumber(btn.textContent.trim()); return; }
+      if(btn.dataset.op){ chooseOp(btn.dataset.op); return; }
+      const act = btn.dataset.action;
+      if(!act) return;
+      if(act==='clear') return clearAll();
+      if(act==='delete') return del();
+      if(act==='dot') return addDot();
+      if(act==='negate') return negate();
+      if(act==='percent') return percent();
+      if(act==='equals') return compute();
+    });
+
+    // Keyboard support
+    window.addEventListener('keydown', (e)=>{
+      const k = e.key;
+      if(/^[0-9]$/.test(k)) return appendNumber(k);
+      if(k === '.') return addDot();
+      if(['+','-','*','/'].includes(k)) return chooseOp(k);
+      if(k === 'Enter' || k === '=') return compute();
+      if(k === 'Backspace') return del();
+      if(k.toLowerCase()==='c' || k==='Escape') return clearAll();
+      if(k === '%') return percent();
+    });
+
+    updateDisplay();
+  </script>
+</body>
+</html>
